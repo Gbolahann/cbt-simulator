@@ -1,0 +1,153 @@
+// prisma/schema.prisma
+// ─────────────────────────────────────────────────────────────
+// Database schema for CBT Simulator
+// Provider: PostgreSQL (Neon)
+// ─────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ── Users ────────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email          String    @unique
+  displayName    String    @map("display_name")
+  passwordHash   String    @map("password_hash")
+  emailVerified  Boolean   @default(false) @map("email_verified")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz // soft delete (30-day grace)
+
+  sessions       Session[]
+
+  @@map("users")
+}
+
+// ── Courses ──────────────────────────────────────────────────
+
+model Course {
+  id            String   @id             // e.g. 'psy202'
+  code          String                   // e.g. 'PSY 202'
+  name          String                   // e.g. 'Physiological Psychology'
+  moduleCount   Int      @map("module_count")
+  questionCount Int      @default(200) @map("question_count")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  questions     Question[]
+  sessions      Session[]
+
+  @@map("courses")
+}
+
+// ── Questions ────────────────────────────────────────────────
+// CRITICAL: cognitive_level and correct_option are NEVER
+// returned to the client during an active exam session.
+// They are fetched server-side only for scoring + admin analytics.
+
+model Question {
+  id             String  @id             // e.g. 'q_psy202_q001'
+  courseId       String  @map("course_id")
+  moduleNumber   Int     @map("module_number")
+  moduleName     String  @map("module_name")
+  concept        String
+  cognitiveLevel String  @map("cognitive_level") // Remember|Understand|Apply|Analyse|Evaluate
+  stem           String  @db.Text
+  optionA        String  @map("option_a") @db.Text
+  optionB        String  @map("option_b") @db.Text
+  optionC        String  @map("option_c") @db.Text
+  optionD        String  @map("option_d") @db.Text
+  correctOption  String  @map("correct_option") @db.Char(1) // 'a'|'b'|'c'|'d'
+  rationale      String? @db.Text
+  sourceRef      String? @map("source_ref")
+  imageUrl       String? @map("image_url")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  course         Course  @relation(fields: [courseId], references: [id])
+  results        SessionQuestionResult[]
+
+  @@index([courseId])
+  @@index([courseId, moduleNumber])  // critical for stratified draw
+  @@map("questions")
+}
+
+// ── Sessions ─────────────────────────────────────────────────
+
+model Session {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  courseId       String    @map("course_id")
+
+  // 35 locked question IDs — drawn at session creation, never change
+  questionIds    String[]  @map("question_ids")
+
+  // Per-question shuffled option display order
+  // { "q_psy202_q001": ["b","d","a","c"], ... }
+  displayOrders  Json      @default("{}") @map("display_orders")
+
+  // User's answers: { "q_psy202_q001": "b", ... }
+  answers        Json      @default("{}") @map("answers")
+
+  // Flagged question IDs
+  flagged        String[]  @default([])
+
+  status         SessionStatus @default(ACTIVE)
+
+  // Populated after submission
+  score          Int?
+  percentage     Decimal?  @db.Decimal(5, 2)
+  passed         Boolean?
+  timeUsedSecs   Int?      @map("time_used_secs")
+
+  // Timestamps
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  submittedAt    DateTime? @map("submitted_at") @db.Timestamptz
+
+  // Append-only audit log: tab switches, violations, answer changes, etc.
+  auditLog       Json      @default("[]") @map("audit_log")
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course         Course  @relation(fields: [courseId], references: [id])
+  results        SessionQuestionResult[]
+
+  @@index([userId])
+  @@index([userId, courseId])
+  @@map("sessions")
+}
+
+enum SessionStatus {
+  ACTIVE
+  SUBMITTED
+  EXPIRED
+}
+
+// ── Session Question Results ──────────────────────────────────
+// Populated server-side after submission. Never written by client.
+
+model SessionQuestionResult {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId      String   @map("session_id") @db.Uuid
+  questionId     String   @map("question_id")
+
+  selectedOption String?  @map("selected_option") @db.Char(1) // 'a'–'d' or null (unanswered)
+  isCorrect      Boolean  @map("is_correct")
+  timeSpentSecs  Int?     @map("time_spent_secs")
+
+  // Denormalized for fast GROUP BY queries on review and analytics
+  moduleNumber   Int      @map("module_number")
+  cognitiveLevel String   @map("cognitive_level") // owner analytics only
+
+  session        Session  @relation(fields: [sessionId], references: [id])
+  question       Question @relation(fields: [questionId], references: [id])
+
+  @@index([sessionId])
+  @@index([questionId])
+  @@map("session_question_results")
+}
