@@ -1,26 +1,66 @@
+/* src/app/globals.css */
 @import "tailwindcss";
 
+/* ── Blueprint Design Tokens ───────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-bg-canvas:      #FFFFFF;
+  --color-bg-surface:     #F8F9FA;
+  --color-text-body:      #212529;
+  --color-text-muted:     #6C757D;
+  --color-accent-primary: #1A73E8;
+  --color-accent-flagged: #F9C74F;
+  --color-accent-warning: #F4A100;
+  --color-accent-danger:  #D62828;
+  --color-accent-success: #2DC653;
+  --color-accent-neutral: #ADB5BD;
+  --color-border:         #DEE2E6;
+  --font-body:            "IBM Plex Sans", "Source Sans 3", system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-bg-canvas:  #121212;
+    --color-bg-surface: #1E1E1E;
+    --color-text-body:  #E9ECEF;
+    --color-border:     #343A40;
   }
 }
 
+/* ── Base styles ────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family:      var(--font-body);
+  background-color: var(--color-bg-canvas);
+  color:            var(--color-text-body);
+  font-size:        1rem;
+  line-height:      1.6;
+  -webkit-font-smoothing:  antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Minimum font sizes — never below 16px body */
+p, li, label, input, textarea, select, button {
+  font-size: max(1rem, 16px);
+}
+
+/* Focus rings — WCAG 2.2 AA: 4px, 3:1 contrast */
+:focus-visible {
+  outline:        3px solid var(--color-accent-primary);
+  outline-offset: 2px;
+  border-radius:  3px;
+}
+
+/* Tailwind utility extensions */
+@layer utilities {
+  .bg-canvas  { background-color: var(--color-bg-canvas);      }
+  .bg-surface { background-color: var(--color-bg-surface);     }
+  .text-body  { color: var(--color-text-body);                  }
+  .text-muted { color: var(--color-text-muted);                 }
+  .text-accent{ color: var(--color-accent-primary);             }
+  .border-token{ border-color: var(--color-border);             }
+  .font-body  { font-family: var(--font-body);                  }
 }
