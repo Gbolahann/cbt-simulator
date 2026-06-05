@@ -10,13 +10,13 @@
  * ─────────────────────────────────────────────────────────────
  */
 
-import crypto from 'crypto';
-import { EXAM_CONFIG } from '../config/exam.config';
+import crypto from "crypto";
+import { EXAM_CONFIG } from "../../config/exam.config";
 
 // ── Types ─────────────────────────────────────────────────────
 
 export interface QuestionSlim {
-  id:           string;
+  id: string;
   moduleNumber: number;
   correctOption: string; // 'a'|'b'|'c'|'d'
 }
@@ -29,11 +29,16 @@ export interface QuestionSlim {
  *   display slot 2 (shown as "C") → DB option A
  *   display slot 3 (shown as "D") → DB option C
  */
-export type OptionOrder = ['a'|'b'|'c'|'d', 'a'|'b'|'c'|'d', 'a'|'b'|'c'|'d', 'a'|'b'|'c'|'d'];
+export type OptionOrder = [
+  "a" | "b" | "c" | "d",
+  "a" | "b" | "c" | "d",
+  "a" | "b" | "c" | "d",
+  "a" | "b" | "c" | "d",
+];
 
 export interface SessionDraw {
-  questionIds:    string[];             // 35 locked IDs in display order
-  displayOrders:  Record<string, OptionOrder>; // per-question option shuffle
+  questionIds: string[]; // 35 locked IDs in display order
+  displayOrders: Record<string, OptionOrder>; // per-question option shuffle
 }
 
 // ── Fisher-Yates shuffle (crypto-seeded) ─────────────────────
@@ -73,34 +78,34 @@ export function drawStratified(allQuestions: QuestionSlim[]): string[] {
   }
 
   const modules = [...byModule.entries()];
-  const total   = allQuestions.length; // should be 200
+  const total = allQuestions.length; // should be 200
 
   // ── Largest-remainder proportional allocation ─────────────
   const exact = modules.map(([mod, qs]) => ({
     mod,
     qs,
-    exact:   (qs.length / total) * TARGET,
-    floor:   Math.floor((qs.length / total) * TARGET),
+    exact: (qs.length / total) * TARGET,
+    floor: Math.floor((qs.length / total) * TARGET),
     remainder: 0,
   }));
 
   for (const e of exact) e.remainder = e.exact - e.floor;
 
-  const allocated = exact.reduce((s, e) => s + e.floor, 0);
+  let allocated = exact.reduce((s, e) => s + e.floor, 0);
   const deficit = TARGET - allocated;
 
   // Give remainder slots to modules with largest fractional parts
   exact
     .sort((a, b) => b.remainder - a.remainder)
     .slice(0, deficit)
-    .forEach(e => e.floor++);
+    .forEach((e) => e.floor++);
 
   // ── Draw from each module ─────────────────────────────────
   const drawn: string[] = [];
-  for (const { qs, floor: count } of exact) {
+  for (const { mod, qs, floor: count } of exact) {
     if (count === 0) continue;
     const shuffled = shuffleArray(qs);
-    drawn.push(...shuffled.slice(0, count).map(q => q.id));
+    drawn.push(...shuffled.slice(0, count).map((q) => q.id));
   }
 
   // ── Final shuffle of the 35 drawn questions ───────────────
@@ -124,7 +129,7 @@ export function buildDisplayOrders(
   questionIds: string[],
 ): Record<string, OptionOrder> {
   const orders: Record<string, OptionOrder> = {};
-  const base: OptionOrder = ['a','b','c','d'];
+  const base: OptionOrder = ["a", "b", "c", "d"];
   for (const id of questionIds) {
     orders[id] = shuffleArray([...base]) as OptionOrder;
   }
@@ -148,8 +153,8 @@ export function resolveCorrectDisplayLetter(
   displayOrder: OptionOrder,
   correctOption: string,
 ): string {
-  const idx = displayOrder.indexOf(correctOption as 'a'|'b'|'c'|'d');
-  return ['a','b','c','d'][idx];
+  const idx = displayOrder.indexOf(correctOption as "a" | "b" | "c" | "d");
+  return ["a", "b", "c", "d"][idx];
 }
 
 // ── Full session draw ─────────────────────────────────────────
@@ -159,7 +164,7 @@ export function resolveCorrectDisplayLetter(
  * returns the complete session draw — 35 locked IDs + display orders.
  */
 export function createSessionDraw(allQuestions: QuestionSlim[]): SessionDraw {
-  const questionIds   = drawStratified(allQuestions);
+  const questionIds = drawStratified(allQuestions);
   const displayOrders = buildDisplayOrders(questionIds);
   return { questionIds, displayOrders };
 }
