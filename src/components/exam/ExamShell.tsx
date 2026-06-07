@@ -1,3 +1,4 @@
+"use client";
 // src/components/exam/ExamShell.tsx
 // Client-only SPA shell. Loads session, runs timer, handles autosave.
 

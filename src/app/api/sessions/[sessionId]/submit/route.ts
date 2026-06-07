@@ -1,5 +1,5 @@
-// POST /api/sessions/[sessionId]/submit
-// Finalises the session and runs the scoring function.
+// src/app/api/sessions/[sessionId]/submit/route.ts
+// POST — finalises the session and runs the scoring function.
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -37,7 +37,6 @@ export async function POST(
   const elapsed =
     (submittedAt.getTime() - examSession.startedAt.getTime()) / 1000;
 
-  // Hard server-side time enforcement
   if (
     elapsed >
     EXAM_CONFIG.TIME_LIMIT_SECONDS + EXAM_CONFIG.SUBMISSION_GRACE_SECS
@@ -62,5 +61,9 @@ export async function POST(
     submittedAt,
   });
 
-  return NextResponse.json({ sessionId, ...scoreReport });
+  // WHY: scoreReport already contains sessionId (returned by scoreSession).
+  // Writing { sessionId, ...scoreReport } duplicated the key — TypeScript
+  // warned that the explicit sessionId was being overwritten by the spread.
+  // Returning scoreReport directly eliminates the duplicate.
+  return NextResponse.json(scoreReport);
 }

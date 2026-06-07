@@ -6,20 +6,31 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+// WHY this interface exists:
+// The user object returned from authorize() is typed by NextAuth as
+// { id, name, email, image } only. We attach rememberMe ourselves,
+// so we need a local type to access it without using "as any".
+interface AuthorizeUser {
+  id: string;
+  email: string;
+  name: string;
+  rememberMe?: boolean;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
 
   pages: {
     signIn: "/login",
-    error:  "/login",
+    error: "/login",
   },
 
   providers: [
     Credentials({
       credentials: {
-        email:      { label: "Email",    type: "email"    },
-        password:   { label: "Password", type: "password" },
-        rememberMe: { label: "Remember", type: "text"     },
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+        rememberMe: { label: "Remember", type: "text" },
       },
 
       async authorize(credentials) {
@@ -37,16 +48,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
         const valid = await bcrypt.compare(
           credentials.password as string,
-          user.passwordHash
+          user.passwordHash,
         );
 
         if (!valid) return null;
 
         return {
-          id:          user.id,
-          email:       user.email,
-          name:        user.displayName,
-          rememberMe:  credentials.rememberMe === "true",
+          id: user.id,
+          email: user.email,
+          name: user.displayName,
+          rememberMe: credentials.rememberMe === "true",
         };
       },
     }),
@@ -55,16 +66,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id          = user.id;
-        token.displayName = user.name;
-        token.rememberMe  = (user as any).rememberMe ?? false;
+        // WHY the cast to AuthorizeUser:
+        // NextAuth's built-in User type does not include rememberMe.
+        // We cast to our local interface so TypeScript knows the field
+        // exists — no "as any" needed.
+        const typedUser = user as AuthorizeUser;
+        token.id = typedUser.id;
+        token.displayName = typedUser.name;
+        token.rememberMe = typedUser.rememberMe ?? false;
       }
       return token;
     },
 
     async session({ session, token }) {
       if (token) {
-        session.user.id          = token.id as string;
+        session.user.id = token.id as string;
         session.user.displayName = token.displayName as string;
       }
       return session;
@@ -76,7 +92,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       options: {
         httpOnly: true,
         sameSite: "lax",
-        secure:   process.env.NODE_ENV === "production",
+        secure: process.env.NODE_ENV === "production",
       },
     },
   },

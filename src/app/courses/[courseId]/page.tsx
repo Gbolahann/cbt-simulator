@@ -119,9 +119,8 @@ export default async function CourseLobbyPage({
             className="text-sm mb-4"
             style={{ color: "var(--color-text-muted)" }}
           >
-            {course.moduleCount} modules · {course.questionBank} questions in
-            bank · {EXAM_CONFIG.QUESTION_COUNT} drawn per session ·{" "}
-            {EXAM_CONFIG.TIME_LIMIT_SECONDS / 60} minutes
+            {course.moduleCount} modules ·{EXAM_CONFIG.TIME_LIMIT_SECONDS / 60}{" "}
+            minutes
           </p>
 
           {/* Stats */}

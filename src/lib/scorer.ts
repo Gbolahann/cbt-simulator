@@ -1,21 +1,19 @@
 /**
- * lib/scorer.ts
- * ─────────────────────────────────────────────────────────────
- * Server-side only. Never import this in client components.
+ * src/lib/scorer.ts
+ * Server-side only — never import in client components.
  *
  * Computes session score after submission:
  *   - Total score (correct × 2, max 70)
  *   - Pass/fail (threshold: 40/70)
  *   - Module breakdown
  *   - Writes SessionQuestionResult rows
- * ─────────────────────────────────────────────────────────────
  */
 
 import { PrismaClient } from "@prisma/client";
 import { EXAM_CONFIG } from "../../config/exam.config";
 import { resolveCorrectDisplayLetter } from "./randomizer";
 import type { OptionOrder } from "./randomizer";
-import type { ScoreReport, ModuleResult } from "../types";
+import type { ScoreReport, ModuleResult } from "../../types";
 
 const prisma = new PrismaClient();
 
@@ -26,13 +24,18 @@ interface ScoringInput {
   courseName: string;
   questionIds: string[];
   displayOrders: Record<string, OptionOrder>;
-  answers: Record<string, string>; // { questionId: displaySlotChosen }
+  answers: Record<string, string>;
   flagged: string[];
   startedAt: Date;
   submittedAt: Date;
 }
 
 export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
+  // WHY flagged is omitted from destructuring:
+  // flagged is part of ScoringInput (kept in the interface so the caller
+  // can pass it without a type error), but the scoring logic itself does
+  // not use it — only correct/incorrect answers affect the score.
+  // Destructuring it would trigger "assigned a value but never used".
   const {
     sessionId,
     userId,
@@ -41,12 +44,11 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
     questionIds,
     displayOrders,
     answers,
-    flagged,
     startedAt,
     submittedAt,
   } = input;
 
-  // ── Fetch full question data (server-side only) ───────────
+  // Fetch full question data server-side only
   const questions = await prisma.question.findMany({
     where: { id: { in: questionIds } },
     select: {
@@ -60,7 +62,6 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
 
   const qMap = new Map(questions.map((q) => [q.id, q]));
 
-  // ── Score each question ───────────────────────────────────
   let correctCount = 0;
   const results: Array<{
     sessionId: string;
@@ -81,9 +82,7 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
     if (!q) continue;
 
     const displayOrder = displayOrders[qId] as OptionOrder;
-    const userAnswer = answers[qId] ?? null; // display slot chosen by user
-
-    // Resolve what display slot the correct DB answer maps to
+    const userAnswer = answers[qId] ?? null;
     const correctDisplaySlot = resolveCorrectDisplayLetter(
       displayOrder,
       q.correctOption,
@@ -101,7 +100,6 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
       cognitiveLevel: q.cognitiveLevel,
     });
 
-    // Accumulate module breakdown
     if (!moduleMap.has(q.moduleNumber)) {
       moduleMap.set(q.moduleNumber, {
         name: q.moduleName,
@@ -123,14 +121,11 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
     (submittedAt.getTime() - startedAt.getTime()) / 1000,
   );
 
-  // ── Write results to DB ───────────────────────────────────
   await prisma.$transaction([
-    // Write per-question results
     prisma.sessionQuestionResult.createMany({
       data: results,
       skipDuplicates: true,
     }),
-    // Update session record
     prisma.examSession.update({
       where: { id: sessionId },
       data: {
@@ -144,7 +139,6 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
     }),
   ]);
 
-  // ── Build module breakdown ────────────────────────────────
   const moduleBreakdown: ModuleResult[] = [...moduleMap.entries()]
     .sort(([a], [b]) => a - b)
     .map(([moduleNumber, data]) => ({
@@ -158,7 +152,6 @@ export async function scoreSession(input: ScoringInput): Promise<ScoreReport> {
           : 0,
     }));
 
-  // ── Fetch attempt history (last 5 sessions) ───────────────
   const history = await prisma.examSession.findMany({
     where: { userId, courseId, status: "SUBMITTED" },
     orderBy: { submittedAt: "desc" },

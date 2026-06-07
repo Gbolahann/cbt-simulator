@@ -29,7 +29,7 @@ export default function QuestionCard({
 }: Props) {
   return (
     <div className="space-y-5">
-      {/* Question stem */}
+      {/* ── Question stem ── */}
       <div
         className="rounded-xl border p-5"
         style={{
@@ -56,7 +56,7 @@ export default function QuestionCard({
         </p>
       </div>
 
-      {/* Options */}
+      {/* ── Options ── */}
       <div className="space-y-2" role="radiogroup" aria-label="Answer options">
         {question.options.map(({ slot, text }) => {
           const selected = selectedSlot === slot;
@@ -66,9 +66,9 @@ export default function QuestionCard({
               role="radio"
               aria-checked={selected}
               onClick={() => onSelect(slot)}
-              className="w-full text-left px-4 py-3 rounded-xl border flex items-start
-                               gap-3 transition-colors min-h-11"
+              className="w-full text-left px-4 py-3 rounded-xl border flex items-start gap-3 transition-colors"
               style={{
+                minHeight: "44px",
                 backgroundColor: selected
                   ? "#EBF3FD"
                   : "var(--color-bg-canvas)",
@@ -79,8 +79,7 @@ export default function QuestionCard({
               }}
             >
               <span
-                className="shrink-0 w-6 h-6 rounded-full border flex items-center
-                               justify-center text-xs font-semibold mt-0.5"
+                className="shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-xs font-semibold mt-0.5"
                 style={{
                   borderColor: selected
                     ? "var(--color-accent-primary)"
@@ -104,13 +103,12 @@ export default function QuestionCard({
         })}
       </div>
 
-      {/* Navigation */}
+      {/* ── Navigation ── */}
       <div className="flex items-center justify-between pt-2">
         <button
           onClick={onBack}
           disabled={index === 0}
-          className="px-4 py-2 rounded-lg text-sm font-medium border
-                           disabled:opacity-40 transition-opacity"
+          className="px-4 py-2 rounded-lg text-sm font-medium border disabled:opacity-40 transition-opacity"
           style={{
             borderColor: "var(--color-border)",
             color: "var(--color-text-body)",
@@ -140,8 +138,7 @@ export default function QuestionCard({
         <button
           onClick={onNext}
           disabled={index === total - 1}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white
-                           disabled:opacity-40 transition-opacity"
+          className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-opacity"
           style={{ backgroundColor: "var(--color-accent-primary)" }}
           aria-keyshortcuts="N"
         >

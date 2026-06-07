@@ -183,7 +183,7 @@ export default async function ResultsPage({
                 <div key={m.num}>
                   <div className="flex justify-between text-xs mb-1">
                     <span
-                      className="truncate max-w-[240px]"
+                      className="truncate max-w-60"
                       style={{ color: "var(--color-text-body)" }}
                     >
                       Module {m.num} — {m.name}
