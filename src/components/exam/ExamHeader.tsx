@@ -1,9 +1,12 @@
 "use client";
 // src/components/exam/ExamHeader.tsx
+// WHY EXAM_CONFIG was removed:
+// It was imported but never referenced in this component — ESLint
+// no-unused-vars rule flags any import that is declared but not used.
+// If you need EXAM_CONFIG values here in future, re-add the import then.
 
 import { useExamStore } from "@/store/examStore";
 import Timer from "./Timer";
-import { EXAM_CONFIG } from "../../../config/exam.config";
 
 export default function ExamHeader({
   onSubmitClick,

@@ -1,7 +1,13 @@
 "use client";
 // src/components/exam/ExamShell.tsx
 // Client-only SPA shell. Loads session, runs timer, handles autosave.
-
+import NetworkStatus from "./NetworkStatus";
+import { posthog } from "@/lib/posthog";
+import {
+  saveSessionLocally,
+  loadSessionLocally,
+  clearSessionLocally,
+} from "@/lib/idb";
 import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useExamStore } from "@/store/examStore";
@@ -28,8 +34,18 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
         flagged: [...store.flagged],
       }),
     });
+    posthog.capture("exam_submitted", {
+      course_id: store.courseId,
+      session_id: sessionId,
+      answered_count: Object.keys(store.answers).length,
+      total_questions: store.questions.length,
+      time_remaining: store.timeRemaining,
+      was_auto_submit: store.timeRemaining === 0,
+    });
     if (res.ok) {
       router.replace(`/results/${sessionId}`);
+      // After router.replace(`/results/${sessionId}`):
+      await clearSessionLocally(sessionId);
     } else {
       store.setSubmitting(false);
       store.setSubmitModal(false);
@@ -42,6 +58,11 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
     store.setSubmitting(true);
     await submitSession();
   }, [store, submitSession]);
+  posthog.capture("exam_time_expired", {
+    course_id: store.courseId,
+    session_id: sessionId,
+    answered_count: Object.keys(store.answers).length,
+  });
 
   // ── Load session on mount ─────────────────────────────────
   useEffect(() => {
@@ -56,13 +77,31 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
         }
         return r.json();
       })
-      .then((data) => {
+      .then(async (data) => {
         if (!data) return;
         if (data.status === "SUBMITTED") {
           router.replace(`/results/${sessionId}`);
           return;
         }
         store.initSession(data);
+        // After store.initSession(data), add:
+        // If server returned no answers (fresh session) check IndexedDB
+        // for locally saved answers from a previous interrupted session
+        if (!data.answers || Object.keys(data.answers).length === 0) {
+          const local = await loadSessionLocally(sessionId);
+          if (local && Object.keys(local.answers).length > 0) {
+            store.initSession({
+              ...data,
+              answers: local.answers,
+              flagged: local.flagged,
+            });
+            posthog.capture("exam_started", {
+              course_id: data.courseId,
+              session_id: sessionId,
+              question_count: data.questions.length,
+            });
+          }
+        }
       });
   }, [sessionId, router, store]);
 
@@ -95,6 +134,33 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
         .then((r) => store.setSyncStatus(r.ok ? "saved" : "error"))
         .catch(() => store.setSyncStatus("offline"));
     }, EXAM_CONFIG.AUTOSAVE_DEBOUNCE_MS);
+    // Inside the autosave interval, update the fetch block to also save locally:
+    fetch(`/api/sessions/${sessionId}/answers`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        answers: store.answers,
+        flagged: [...store.flagged],
+      }),
+    })
+      .then((r) => {
+        store.setSyncStatus(r.ok ? "saved" : "error");
+        if (r.ok) {
+          // Also persist locally so offline recovery works
+          saveSessionLocally(sessionId, {
+            answers: store.answers,
+            flagged: [...store.flagged],
+          });
+        }
+      })
+      .catch(() => {
+        store.setSyncStatus("offline");
+        // Save locally even when server is unreachable
+        saveSessionLocally(sessionId, {
+          answers: store.answers,
+          flagged: [...store.flagged],
+        });
+      });
 
     return () => clearInterval(syncRef.current!);
   }, [sessionId, store, store.answers, store.flagged, store.syncStatus]);
@@ -185,6 +251,7 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
           isSubmitting={store.isSubmitting}
         />
       )}
+      <NetworkStatus />
     </div>
   );
 }

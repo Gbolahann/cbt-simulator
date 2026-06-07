@@ -11,6 +11,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useExamStore } from "@/store/examStore";
 import { EXAM_CONFIG } from "../../config/exam.config";
+import { posthog } from "@/lib/posthog";
 
 export function useSecurityMonitor(sessionId: string) {
   const { addViolation, violationCount } = useExamStore();
@@ -20,13 +21,18 @@ export function useSecurityMonitor(sessionId: string) {
     async (type: string) => {
       addViolation();
       await fetch(`/api/sessions/${sessionId}/audit`, {
-        method:  "POST",
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          timestamp:      new Date().toISOString(),
+          timestamp: new Date().toISOString(),
           violationCount: violationCount + 1,
         }),
+      });
+      posthog.capture("exam_violation", {
+        violation_type: type,
+        session_id: sessionId,
+        violation_count: violationCount + 1,
       });
       if (
         violationCount + 1 >= EXAM_CONFIG.TAB_SWITCH_WARNING_AT &&
@@ -64,10 +70,10 @@ export function useSecurityMonitor(sessionId: string) {
 
   // Prevent text selection via CSS
   useEffect(() => {
-    document.body.style.userSelect       = "none";
+    document.body.style.userSelect = "none";
     document.body.style.webkitUserSelect = "none";
     return () => {
-      document.body.style.userSelect       = "";
+      document.body.style.userSelect = "";
       document.body.style.webkitUserSelect = "";
     };
   }, []); // no dependencies — runs once on mount

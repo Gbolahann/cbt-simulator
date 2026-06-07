@@ -1,13 +1,17 @@
 // src/app/api/sessions/[sessionId]/audit/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
-const prisma = new PrismaClient();
-
-// WHY: Prisma stores auditLog as Json. We cast to this type
-// instead of any[] to satisfy the no-explicit-any ESLint rule.
-type AuditEvent = Record<string, unknown>;
+// WHY Prisma.InputJsonValue instead of our own AuditEvent type:
+// The auditLog column is typed as Json in the Prisma schema.
+// When writing to it, Prisma requires a value that matches InputJsonValue.
+// Our previous Record<string, unknown>[] was rejected because Prisma's
+// InputJsonObject requires { [Key: string]: InputJsonValue } — the value
+// type must also be InputJsonValue, not unknown.
+// Using Prisma's own type satisfies this constraint without any workarounds.
+type AuditEvent = Record<string, Prisma.InputJsonValue>;
 
 export async function POST(
   req: NextRequest,
@@ -29,10 +33,13 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const log = [...(examSession.auditLog as AuditEvent[]), event];
+  // Cast existing log to AuditEvent[] and append the new event
+  const existingLog = (examSession.auditLog as AuditEvent[]) ?? [];
+  const updatedLog: Prisma.InputJsonValue = [...existingLog, event];
+
   await prisma.examSession.update({
     where: { id: sessionId },
-    data: { auditLog: log },
+    data: { auditLog: updatedLog },
   });
 
   return NextResponse.json({ ok: true });
