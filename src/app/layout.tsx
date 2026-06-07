@@ -1,7 +1,8 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
+import SentryProvider from "@/components/SentryProvider";
 import PostHogProvider from "@/components/PostHogProvider";
 import "./globals.css";
 
@@ -12,11 +13,15 @@ const ibmPlexSans = IBM_Plex_Sans({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  themeColor: "#1A73E8",
+};
+
 export const metadata: Metadata = {
   title: "CBT Simulator",
   description: "Practice MCQ simulator for your professional examination",
   manifest: "/manifest.json",
-  themeColor: "#1A73E8",
+  // themeColor removed from here — moved to viewport above
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -37,7 +42,9 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased bg-canvas text-body">
         <SessionProvider>
-          <PostHogProvider>{children}</PostHogProvider>
+          <SentryProvider>
+            <PostHogProvider>{children}</PostHogProvider>
+          </SentryProvider>
         </SessionProvider>
       </body>
     </html>
