@@ -13,7 +13,7 @@ import { PrismaClient } from "@prisma/client";
 import { EXAM_CONFIG } from "../../config/exam.config";
 import { resolveCorrectDisplayLetter } from "./randomizer";
 import type { OptionOrder } from "./randomizer";
-import type { ScoreReport, ModuleResult } from "../../types";
+import type { ScoreReport, ModuleResult } from "../types";
 
 const prisma = new PrismaClient();
 

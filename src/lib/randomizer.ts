@@ -91,7 +91,7 @@ export function drawStratified(allQuestions: QuestionSlim[]): string[] {
 
   for (const e of exact) e.remainder = e.exact - e.floor;
 
-  let allocated = exact.reduce((s, e) => s + e.floor, 0);
+  const allocated = exact.reduce((s, e) => s + e.floor, 0);
   const deficit = TARGET - allocated;
 
   // Give remainder slots to modules with largest fractional parts
@@ -102,7 +102,7 @@ export function drawStratified(allQuestions: QuestionSlim[]): string[] {
 
   // ── Draw from each module ─────────────────────────────────
   const drawn: string[] = [];
-  for (const { mod, qs, floor: count } of exact) {
+  for (const { qs, floor: count } of exact) {
     if (count === 0) continue;
     const shuffled = shuffleArray(qs);
     drawn.push(...shuffled.slice(0, count).map((q) => q.id));
