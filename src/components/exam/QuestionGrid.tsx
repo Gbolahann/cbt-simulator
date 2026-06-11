@@ -81,7 +81,7 @@ export default function QuestionGrid() {
                 onClick={() => goTo(i)}
                 aria-label={`Question ${i + 1}${isFlagged ? " flagged" : ""}${isAnswered ? " answered" : ""}`}
                 className="w-9 h-9 rounded-full flex items-center justify-center
-                                 text-xs font-medium transition-colors min-w-[44px] min-h-[44px]"
+                                 text-xs font-medium transition-colors min-w-11 min-h-11"
                 style={{
                   backgroundColor: isCurrent
                     ? "var(--color-accent-primary)"

@@ -102,8 +102,8 @@ export default async function CourseLobbyPage({
           <div
             className="inline-block px-2 py-0.5 rounded text-xs font-semibold mb-3"
             style={{
-              backgroundColor: "#EBF3FD",
-              color: "var(--color-accent-primary)",
+              backgroundColor: "var(--color-accent-primary)",
+              color: "white",
             }}
           >
             {course.code}
@@ -258,10 +258,10 @@ export default async function CourseLobbyPage({
                     <span
                       className="text-xs font-semibold px-2 py-0.5 rounded-full"
                       style={{
-                        backgroundColor: passed ? "#F0FFF4" : "#FFF5F5",
-                        color: passed
+                        backgroundColor: passed
                           ? "var(--color-accent-success)"
                           : "var(--color-accent-danger)",
+                        color: "white",
                       }}
                     >
                       {passed ? "PASS" : "FAIL"}

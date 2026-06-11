@@ -143,8 +143,8 @@ export default async function DashboardPage() {
                 <div
                   className="inline-block px-2 py-0.5 rounded text-xs font-semibold mb-3"
                   style={{
-                    backgroundColor: "#EBF3FD",
-                    color: "var(--color-accent-primary)",
+                    backgroundColor: "var(--color-accent-primary)",
+                    color: "white",
                   }}
                 >
                   {course.code}

@@ -1,10 +1,10 @@
 "use client";
 // src/components/PostHogProvider.tsx
-// Initialises PostHog on app load and identifies the logged-in user.
+// PostHog is deferred by 3 seconds after page load.
+// This removes it from the critical rendering path entirely.
 
 import { useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { initPostHog, posthog } from "@/lib/posthog";
 
 export default function PostHogProvider({
   children,
@@ -14,22 +14,20 @@ export default function PostHogProvider({
   const { data: session } = useSession();
 
   useEffect(() => {
-    initPostHog();
-  }, []);
+    // Delay PostHog initialisation — do not block initial page render
+    const timer = setTimeout(async () => {
+      const { initPostHog, posthog } = await import("@/lib/posthog");
+      initPostHog();
 
-  // When a user logs in, identify them in PostHog
-  // This links all their events to one profile
-  useEffect(() => {
-    if (session?.user?.id) {
-      posthog.identify(session.user.id, {
-        // Only send non-sensitive properties
-        name: session.user.displayName,
-      });
-    } else {
-      // When logged out, reset to anonymous
-      posthog.reset();
-    }
-  }, [session?.user?.displayName, session?.user?.id]);
+      if (session?.user?.id) {
+        posthog.identify(session.user.id, {
+          name: session.user.displayName,
+        });
+      }
+    }, 3000); // 3 seconds after mount
+
+    return () => clearTimeout(timer);
+  }, [session?.user?.id, session?.user?.displayName]);
 
   return <>{children}</>;
 }
