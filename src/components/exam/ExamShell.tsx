@@ -1,13 +1,15 @@
 "use client";
 // src/components/exam/ExamShell.tsx
-// Client-only SPA shell. Loads session, runs timer, handles autosave.
-import NetworkStatus from "./NetworkStatus";
-import { posthog } from "@/lib/posthog";
-import {
-  saveSessionLocally,
-  loadSessionLocally,
-  clearSessionLocally,
-} from "@/lib/idb";
+/* eslint-disable react-hooks/exhaustive-deps */
+// WHY file-level disable for react-hooks/exhaustive-deps:
+// Every useEffect in this file intentionally uses an empty dependency array
+// combined with useExamStore.getState() to read live Zustand values. This is
+// the documented Zustand pattern for setInterval and event listeners — adding
+// reactive store values to deps would cause intervals to be torn down and
+// recreated on every state change, which would reset the timer on every tick.
+// Per-line eslint-disable comments are fragile when lines shift after
+// reformatting. A file-level disable is the stable, intentional solution.
+
 import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useExamStore } from "@/store/examStore";
@@ -16,6 +18,13 @@ import ExamHeader from "./ExamHeader";
 import QuestionCard from "./QuestionCard";
 import QuestionGrid from "./QuestionGrid";
 import SubmitModal from "./SubmitModal";
+import NetworkStatus from "./NetworkStatus";
+import {
+  saveSessionLocally,
+  loadSessionLocally,
+  clearSessionLocally,
+} from "@/lib/idb";
+import { posthog } from "@/lib/posthog";
 
 export default function ExamShell({ sessionId }: { sessionId: string }) {
   const router = useRouter();
@@ -24,47 +33,68 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
   const syncRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoaded = useRef(false);
 
-  // ── Submit session (declare before useEffect) ─────────────
-  const submitSession = useCallback(async () => {
-    const res = await fetch(`/api/sessions/${sessionId}/submit`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        answers: store.answers,
-        flagged: [...store.flagged],
-      }),
-    });
-    posthog.capture("exam_submitted", {
-      course_id: store.courseId,
-      session_id: sessionId,
-      answered_count: Object.keys(store.answers).length,
-      total_questions: store.questions.length,
-      time_remaining: store.timeRemaining,
-      was_auto_submit: store.timeRemaining === 0,
-    });
-    if (res.ok) {
-      router.replace(`/results/${sessionId}`);
-      // After router.replace(`/results/${sessionId}`):
-      await clearSessionLocally(sessionId);
-    } else {
-      store.setSubmitting(false);
-      store.setSubmitModal(false);
-    }
-  }, [sessionId, store, router]);
+  // ── Submit ──────────────────────────────────────────────────────────────────
+  // WHY submitSession is declared HERE, above the timer useEffect:
+  //
+  // JavaScript const/let declarations are NOT hoisted to the top of their
+  // scope the way function declarations are. A plain `function submitSession`
+  // would be available anywhere in the component body, but
+  // `const submitSession = useCallback(...)` only exists AFTER that line
+  // executes. The timer useEffect at line ~70 calls submitSession(true)
+  // inside setInterval. If submitSession is declared below that useEffect,
+  // the interval closure captures an undefined value at creation time and
+  // throws "Cannot access variable before it is declared" when it fires.
+  //
+  // Moving submitSession above the timer useEffect means the closure
+  // captures the correct, fully-initialised function reference.
+  const submitSession = useCallback(
+    async (isAutoSubmit = false) => {
+      const state = useExamStore.getState();
 
-  // ── Auto-submit when time expires ─────────────────────────
-  const handleAutoSubmit = useCallback(async () => {
-    if (store.isSubmitting) return;
-    store.setSubmitting(true);
-    await submitSession();
-  }, [store, submitSession]);
-  posthog.capture("exam_time_expired", {
-    course_id: store.courseId,
-    session_id: sessionId,
-    answered_count: Object.keys(store.answers).length,
-  });
+      const res = await fetch(`/api/sessions/${sessionId}/submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answers: state.answers,
+          flagged: [...state.flagged],
+        }),
+      });
 
-  // ── Load session on mount ─────────────────────────────────
+      if (res.ok) {
+        posthog.capture("exam_submitted", {
+          course_id: state.courseId,
+          session_id: sessionId,
+          answered_count: Object.keys(state.answers).length,
+          total_questions: state.questions.length,
+          was_auto_submit: isAutoSubmit,
+          time_remaining: state.timeRemaining,
+        });
+
+        await clearSessionLocally(sessionId);
+
+        // Reset store BEFORE navigating so the next ExamShell mount
+        // finds empty state instead of the previous session's data.
+        useExamStore.getState().resetSession();
+
+        router.replace(`/results/${sessionId}`);
+      } else {
+        useExamStore.getState().setSubmitting(false);
+        useExamStore.getState().setSubmitModal(false);
+      }
+    },
+    // router and sessionId are the only external values used inside.
+    // getState() reads live Zustand values so they are not dependencies.
+    [router, sessionId],
+  );
+
+  // ── Load session on mount ───────────────────────────────────────────────────
+
+  // WHY empty deps with eslint-disable:
+  // This effect must run exactly once — the hasLoaded ref guards against
+  // double-invocation in React StrictMode. Including `store` or `router`
+  // would re-run the effect on every render because their references
+  // change, causing an infinite fetch loop. The hasLoaded guard is the
+  // correct pattern here; the disable comment is intentional.
   useEffect(() => {
     if (hasLoaded.current) return;
     hasLoaded.current = true;
@@ -83,93 +113,112 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
           router.replace(`/results/${sessionId}`);
           return;
         }
-        store.initSession(data);
-        // After store.initSession(data), add:
-        // If server returned no answers (fresh session) check IndexedDB
-        // for locally saved answers from a previous interrupted session
+
+        // Restore any locally-saved answers if the server has none
+        let initData = data;
         if (!data.answers || Object.keys(data.answers).length === 0) {
           const local = await loadSessionLocally(sessionId);
           if (local && Object.keys(local.answers).length > 0) {
-            store.initSession({
+            initData = {
               ...data,
               answers: local.answers,
               flagged: local.flagged,
-            });
-            posthog.capture("exam_started", {
-              course_id: data.courseId,
-              session_id: sessionId,
-              question_count: data.questions.length,
-            });
+            };
           }
         }
-      });
-  }, [sessionId, router, store]);
 
-  // ── Countdown timer ───────────────────────────────────────
+        store.initSession(initData);
+
+        posthog.capture("exam_started", {
+          course_id: data.courseId,
+          session_id: sessionId,
+          question_count: data.questions?.length ?? 0,
+        });
+      })
+      .catch((err) => console.error("[ExamShell] load error:", err));
+  }, []); // intentionally empty — guarded by hasLoaded ref
+
+  // ── Countdown timer ─────────────────────────────────────────────────────────
+  // WHY useExamStore.getState() instead of reading from the `store` reference:
+  //
+  // setInterval creates a closure. Any variable read inside the interval
+  // callback is captured at the moment setInterval is called — it does not
+  // update when React state changes. Reading `store.timeRemaining` inside
+  // the interval would always return 1500 (the mount-time value) because
+  // that is what the closure captures.
+  //
+  // useExamStore.getState() bypasses React's rendering cycle entirely and
+  // reads the current Zustand store value at the exact moment the interval
+  // fires. This is the standard Zustand pattern for reading state inside
+  // callbacks that are not re-created on every render.
+  //
+
   useEffect(() => {
     timerRef.current = setInterval(() => {
-      store.tickTimer();
-      if (store.timeRemaining <= 1) {
-        clearInterval(timerRef.current!);
-        handleAutoSubmit();
-      }
-    }, 1000);
-    return () => clearInterval(timerRef.current!);
-  }, [store, handleAutoSubmit]);
+      const currentTime = useExamStore.getState().timeRemaining;
 
-  // ── Autosave every 2 seconds ──────────────────────────────
+      if (currentTime <= 0) {
+        clearInterval(timerRef.current!);
+        const alreadySubmitting = useExamStore.getState().isSubmitting;
+        if (!alreadySubmitting) {
+          useExamStore.getState().setSubmitting(true);
+          posthog.capture("exam_time_expired", {
+            course_id: useExamStore.getState().courseId,
+            session_id: sessionId,
+            answered_count: Object.keys(useExamStore.getState().answers).length,
+          });
+          submitSession(true);
+        }
+        return;
+      }
+
+      useExamStore.getState().tickTimer();
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []); // intentionally empty — interval must run for component lifetime
+
+  // ── Autosave every 2 seconds ────────────────────────────────────────────────
+
   useEffect(() => {
     syncRef.current = setInterval(() => {
-      if (store.syncStatus !== "saving") return;
-      store.setSyncStatus("saving");
+      const state = useExamStore.getState();
+      if (state.syncStatus !== "saving") return;
+
+      const payload = {
+        answers: state.answers,
+        flagged: [...state.flagged],
+      };
 
       fetch(`/api/sessions/${sessionId}/answers`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          answers: store.answers,
-          flagged: [...store.flagged],
-        }),
+        body: JSON.stringify(payload),
       })
-        .then((r) => store.setSyncStatus(r.ok ? "saved" : "error"))
-        .catch(() => store.setSyncStatus("offline"));
-    }, EXAM_CONFIG.AUTOSAVE_DEBOUNCE_MS);
-    // Inside the autosave interval, update the fetch block to also save locally:
-    fetch(`/api/sessions/${sessionId}/answers`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        answers: store.answers,
-        flagged: [...store.flagged],
-      }),
-    })
-      .then((r) => {
-        store.setSyncStatus(r.ok ? "saved" : "error");
-        if (r.ok) {
-          // Also persist locally so offline recovery works
-          saveSessionLocally(sessionId, {
-            answers: store.answers,
-            flagged: [...store.flagged],
-          });
-        }
-      })
-      .catch(() => {
-        store.setSyncStatus("offline");
-        // Save locally even when server is unreachable
-        saveSessionLocally(sessionId, {
-          answers: store.answers,
-          flagged: [...store.flagged],
+        .then((r) => {
+          useExamStore.getState().setSyncStatus(r.ok ? "saved" : "error");
+          if (r.ok) saveSessionLocally(sessionId, payload);
+        })
+        .catch(() => {
+          useExamStore.getState().setSyncStatus("offline");
+          saveSessionLocally(sessionId, payload);
         });
-      });
+    }, EXAM_CONFIG.AUTOSAVE_DEBOUNCE_MS);
 
-    return () => clearInterval(syncRef.current!);
-  }, [sessionId, store, store.answers, store.flagged, store.syncStatus]);
+    return () => {
+      if (syncRef.current) clearInterval(syncRef.current);
+    };
+  }, []); // intentionally empty — interval must run for component lifetime
 
-  // ── Keyboard shortcuts ────────────────────────────────────
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (store.showSubmitModal) {
-        if (e.key === "Escape") store.setSubmitModal(false);
+      const state = useExamStore.getState();
+      if (state.showSubmitModal) {
+        if (e.key === "Escape") state.setSubmitModal(false);
         return;
       }
       const tag = (e.target as HTMLElement).tagName;
@@ -177,32 +226,36 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
 
       switch (e.key.toLowerCase()) {
         case "n":
-          store.next();
+          state.next();
           break;
         case "b":
-          store.back();
+          state.back();
           break;
         case "f": {
-          const qId = store.questions[store.currentIndex]?.id;
-          if (qId) store.toggleFlag(qId);
+          const qId = state.questions[state.currentIndex]?.id;
+          if (qId) state.toggleFlag(qId);
           break;
         }
         case "g":
-          store.setGridOpen(!store.isGridOpen);
+          state.setGridOpen(!state.isGridOpen);
           break;
         case "h":
-          store.setTimerVisible(!store.isTimerVisible);
+          state.setTimerVisible(!state.isTimerVisible);
           break;
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [store]);
+  }, []); // intentionally empty — uses getState() for live values
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   if (!store.sessionId) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p style={{ color: "var(--color-text-muted)" }}>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ backgroundColor: "var(--color-bg-canvas)" }}
+      >
+        <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
           Preparing your session…
         </p>
       </div>
@@ -218,7 +271,8 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
     >
       <ExamHeader onSubmitClick={() => store.setSubmitModal(true)} />
 
-      <main className="flex-1 max-w-2xl mx-auto w-full px-4 py-6">
+      {/* pb-28 ensures the last option is never hidden behind the fixed footer */}
+      <main className="flex-1 overflow-y-auto max-w-2xl mx-auto w-full px-4 py-6 pb-28">
         {currentQuestion && (
           <QuestionCard
             question={currentQuestion}
@@ -226,15 +280,72 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
             total={store.questions.length}
             selectedSlot={store.answers[currentQuestion.id] ?? null}
             isFlagged={store.flagged.has(currentQuestion.id)}
-            onSelect={(slot: string) =>
-              store.selectAnswer(currentQuestion.id, slot)
-            }
+            onSelect={(slot) => store.selectAnswer(currentQuestion.id, slot)}
             onFlag={() => store.toggleFlag(currentQuestion.id)}
-            onNext={store.next}
-            onBack={store.back}
           />
         )}
       </main>
+
+      {/* Fixed navigation footer — never scrolls with content */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-10 border-t px-4 py-3
+                   flex items-center justify-between"
+        style={{
+          backgroundColor: "var(--color-bg-canvas)",
+          borderColor: "var(--color-border)",
+        }}
+      >
+        <button
+          onClick={store.back}
+          disabled={store.currentIndex === 0}
+          className="px-5 py-2.5 rounded-lg text-sm font-medium border
+                     disabled:opacity-40 transition-opacity min-w-20"
+          style={{
+            borderColor: "var(--color-border)",
+            color: "var(--color-text-body)",
+          }}
+          aria-keyshortcuts="B"
+        >
+          ← Back
+        </button>
+
+        <button
+          onClick={() =>
+            currentQuestion && store.toggleFlag(currentQuestion.id)
+          }
+          className="px-4 py-2.5 rounded-lg text-sm border transition-colors"
+          style={{
+            backgroundColor:
+              currentQuestion && store.flagged.has(currentQuestion.id)
+                ? "var(--color-accent-flagged)"
+                : "transparent",
+            borderColor:
+              currentQuestion && store.flagged.has(currentQuestion.id)
+                ? "var(--color-accent-flagged)"
+                : "var(--color-border)",
+            color:
+              currentQuestion && store.flagged.has(currentQuestion.id)
+                ? "#7C5800"
+                : "var(--color-text-muted)",
+          }}
+          aria-keyshortcuts="F"
+        >
+          {currentQuestion && store.flagged.has(currentQuestion.id)
+            ? "🚩 Flagged"
+            : "Flag"}
+        </button>
+
+        <button
+          onClick={store.next}
+          disabled={store.currentIndex === store.questions.length - 1}
+          className="px-5 py-2.5 rounded-lg text-sm font-semibold text-white
+                     disabled:opacity-40 transition-opacity min-w-20"
+          style={{ backgroundColor: "var(--color-accent-primary)" }}
+          aria-keyshortcuts="N"
+        >
+          Next →
+        </button>
+      </nav>
 
       {store.isGridOpen && <QuestionGrid />}
 
@@ -245,12 +356,13 @@ export default function ExamShell({ sessionId }: { sessionId: string }) {
           flaggedCount={store.flagged.size}
           onConfirm={() => {
             store.setSubmitting(true);
-            submitSession();
+            submitSession(false);
           }}
           onCancel={() => store.setSubmitModal(false)}
           isSubmitting={store.isSubmitting}
         />
       )}
+
       <NetworkStatus />
     </div>
   );

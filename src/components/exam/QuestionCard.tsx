@@ -1,5 +1,8 @@
 "use client";
 // src/components/exam/QuestionCard.tsx
+// Navigation buttons (Back / Flag / Next) have been moved to a fixed footer
+// in ExamShell.tsx. This component now only renders the question stem and
+// answer options, which scroll freely under the fixed footer.
 
 import { ExamQuestion } from "@/store/examStore";
 import Image from "next/image";
@@ -12,8 +15,6 @@ interface Props {
   isFlagged: boolean;
   onSelect: (slot: string) => void;
   onFlag: () => void;
-  onNext: () => void;
-  onBack: () => void;
 }
 
 export default function QuestionCard({
@@ -23,13 +24,23 @@ export default function QuestionCard({
   selectedSlot,
   isFlagged,
   onSelect,
-  onFlag,
-  onNext,
-  onBack,
 }: Props) {
   return (
-    <div className="space-y-5">
-      {/* ── Question stem ── */}
+    <div className="space-y-4">
+      {/* Question counter */}
+      <p
+        className="text-xs font-medium"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        Question {index + 1} of {total}
+        {isFlagged && (
+          <span className="ml-2" style={{ color: "#7C5800" }}>
+            🚩 Flagged
+          </span>
+        )}
+      </p>
+
+      {/* Question stem */}
       <div
         className="rounded-xl border p-5"
         style={{
@@ -56,7 +67,7 @@ export default function QuestionCard({
         </p>
       </div>
 
-      {/* ── Options ── */}
+      {/* Options */}
       <div className="space-y-2" role="radiogroup" aria-label="Answer options">
         {question.options.map(({ slot, text }) => {
           const selected = selectedSlot === slot;
@@ -101,49 +112,6 @@ export default function QuestionCard({
             </button>
           );
         })}
-      </div>
-
-      {/* ── Navigation ── */}
-      <div className="flex items-center justify-between pt-2">
-        <button
-          onClick={onBack}
-          disabled={index === 0}
-          className="px-4 py-2 rounded-lg text-sm font-medium border disabled:opacity-40 transition-opacity"
-          style={{
-            borderColor: "var(--color-border)",
-            color: "var(--color-text-body)",
-          }}
-          aria-keyshortcuts="B"
-        >
-          ← Back (B)
-        </button>
-
-        <button
-          onClick={onFlag}
-          className="px-3 py-2 rounded-lg text-sm border transition-colors"
-          style={{
-            backgroundColor: isFlagged
-              ? "var(--color-accent-flagged)"
-              : "transparent",
-            borderColor: isFlagged
-              ? "var(--color-accent-flagged)"
-              : "var(--color-border)",
-            color: isFlagged ? "#7C5800" : "var(--color-text-muted)",
-          }}
-          aria-keyshortcuts="F"
-        >
-          {isFlagged ? "🚩 Flagged (F)" : "Flag (F)"}
-        </button>
-
-        <button
-          onClick={onNext}
-          disabled={index === total - 1}
-          className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-opacity"
-          style={{ backgroundColor: "var(--color-accent-primary)" }}
-          aria-keyshortcuts="N"
-        >
-          Next (N) →
-        </button>
       </div>
     </div>
   );
