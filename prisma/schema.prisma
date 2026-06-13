@@ -134,7 +134,7 @@ model SessionQuestionResult {
   moduleNumber   Int      @map("module_number")
   cognitiveLevel String   @map("cognitive_level")
 
-  session  ExamSession @relation(fields: [sessionId], references: [id])
+  session  ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   question Question    @relation(fields: [questionId], references: [id])
 
   @@index([sessionId])
