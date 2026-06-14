@@ -1,14 +1,11 @@
 // src/app/dashboard/page.tsx
-// Flat route — NOT inside (dashboard) route group
-// Import uses ../../config/courses (2 levels up from src/app/dashboard/)
-
-import { auth } from "@/lib/auth";
-import { PrismaClient } from "@prisma/client";
+import { auth, signOut } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { COURSES } from "../../../config/courses";
 import Link from "next/link";
-
-const prisma = new PrismaClient();
+import { COURSES } from "../../config/courses";
+import { EXAM_CONFIG } from "../../config/exam.config";
+import HowItWorks from "@/components/HowItWorks";
 
 async function getCourseStats(userId: string) {
   const sessions = await prisma.examSession.findMany({
@@ -40,7 +37,6 @@ async function getCourseStats(userId: string) {
       (b, s) => (!b || (s.score ?? 0) > (b.score ?? 0) ? s : b),
       null,
     );
-
     statsMap[course.id] = {
       attempts: cs.length,
       bestScore: best?.score ?? null,
@@ -49,11 +45,10 @@ async function getCourseStats(userId: string) {
       lastPassed: cs[0]?.passed ?? null,
     };
   }
-
   return statsMap;
 }
 
-function formatDate(iso: string | null): string {
+function formatDate(iso: string | null) {
   if (!iso) return "—";
   return new Date(iso).toLocaleDateString("en-NG", {
     day: "numeric",
@@ -98,31 +93,49 @@ export default async function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span
-              className="text-sm"
+              className="text-sm hidden sm:block"
               style={{ color: "var(--color-text-muted)" }}
             >
               {session.user.displayName}
             </span>
-            <Link
-              href="/api/auth/signout"
-              className="text-sm hover:underline"
-              style={{ color: "var(--color-text-muted)" }}
+            {/* Server-action form — required by eslint(@next/next/no-html-link-for-pages).
+                A plain <a> to /api/auth/signout is treated as a page route by Next.js.
+                Using a form + server action is the correct NextAuth v5 pattern. */}
+            <form
+              action={async () => {
+                "use server";
+                await signOut({ redirectTo: "/login" });
+              }}
             >
-              Log out
-            </Link>
+              <button
+                type="submit"
+                className="text-sm hover:underline bg-transparent border-0 p-0 cursor-pointer"
+                style={{ color: "var(--color-text-muted)" }}
+              >
+                Log out
+              </button>
+            </form>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-5xl mx-auto px-4 py-8">
-        <div className="mb-8">
+        {/* Intro card — shown to first-time users, dismissible */}
+        <HowItWorks />
+
+        {/* Page heading */}
+        <div className="mb-6">
           <h1
             className="text-2xl font-semibold mb-1"
             style={{ color: "var(--color-text-body)" }}
           >
             Your Courses
           </h1>
+          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
+            {COURSES.length} courses · 200 questions each ·{" "}
+            {EXAM_CONFIG.QUESTION_COUNT} drawn per session ·{" "}
+            {EXAM_CONFIG.TIME_LIMIT_SECONDS / 60} minutes
+          </p>
         </div>
 
         {/* Course grid */}
@@ -139,7 +152,7 @@ export default async function DashboardPage() {
                   borderColor: "var(--color-border)",
                 }}
               >
-                {/* Code badge */}
+                {/* Course code badge */}
                 <div
                   className="inline-block px-2 py-0.5 rounded text-xs font-semibold mb-3"
                   style={{
@@ -150,7 +163,7 @@ export default async function DashboardPage() {
                   {course.code}
                 </div>
 
-                {/* Name */}
+                {/* Course name */}
                 <h2
                   className="text-sm font-semibold mb-4 leading-snug"
                   style={{ color: "var(--color-text-body)" }}
@@ -158,7 +171,7 @@ export default async function DashboardPage() {
                   {course.name}
                 </h2>
 
-                {/* Stats */}
+                {/* Stats or first-time CTA */}
                 {s.attempts === 0 ? (
                   <p
                     className="text-xs"
@@ -176,7 +189,7 @@ export default async function DashboardPage() {
                         className="font-medium"
                         style={{ color: "var(--color-text-body)" }}
                       >
-                        {s.bestScore} / 70
+                        {s.bestScore} / {EXAM_CONFIG.MAX_SCORE}
                         <span
                           className="ml-1"
                           style={{ color: "var(--color-text-muted)" }}
@@ -207,7 +220,7 @@ export default async function DashboardPage() {
                   </div>
                 )}
 
-                {/* CTA */}
+                {/* Footer */}
                 <div
                   className="mt-4 pt-3 border-t flex justify-between items-center"
                   style={{ borderColor: "var(--color-border)" }}
