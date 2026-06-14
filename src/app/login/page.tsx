@@ -1,7 +1,7 @@
 "use client";
 // src/app/login/page.tsx
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
@@ -9,30 +9,39 @@ import { Suspense } from "react";
 
 function LoginForm() {
   const searchParams = useSearchParams();
-  const verifiedParam = searchParams.get("verified");
-  const errorParam = searchParams.get("error");
+
+  const [banner, setBanner] = useState<string>(() => {
+    if (searchParams.get("verified") === "true") {
+      return "✅ Email verified! You can now log in.";
+    }
+    return "";
+  });
+
+  const [error, setError] = useState<string>(() => {
+    const err = searchParams.get("error");
+    if (err === "link-expired")
+      return "This verification link has expired. Request a new one below.";
+    if (err === "invalid-link")
+      return "This verification link is invalid. Request a new one below.";
+    return "";
+  });
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
-  const [banner, setBanner] = useState("");
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (verifiedParam === "true") {
-      setBanner("✅ Email verified! You can now log in.");
-    }
-    if (errorParam === "link-expired") {
-      setError("This verification link has expired. Please register again.");
-    }
-    if (errorParam === "invalid-link") {
-      setError(
-        "This verification link is invalid. Please register again or contact support.",
-      );
-    }
-  }, [verifiedParam, errorParam]);
+  // Controls whether the "Resend verification" UI is shown
+  const [showResend, setShowResend] = useState(
+    // Pre-show if arriving from an expired/invalid link
+    () =>
+      ["link-expired", "invalid-link"].includes(
+        searchParams.get("error") ?? "",
+      ),
+  );
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendFeedback, setResendFeedback] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,7 +59,11 @@ function LoginForm() {
     setLoading(false);
 
     if (result?.error === "EMAIL_NOT_VERIFIED") {
-      setError("Please verify your email before logging in. Check your inbox.");
+      setError(
+        "Your email is not yet verified. Check your inbox or request a new link below.",
+      );
+      setShowResend(true);
+      setResendEmail(email); // pre-fill resend field
       return;
     }
     if (result?.error || !result?.ok) {
@@ -59,6 +72,31 @@ function LoginForm() {
     }
 
     window.location.href = "/dashboard";
+  }
+
+  async function handleResend(e: React.FormEvent) {
+    e.preventDefault();
+    setResendFeedback("");
+    setResendLoading(true);
+
+    const res = await fetch("/api/auth/resend-verification", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: resendEmail }),
+    });
+
+    const data = await res.json();
+    setResendLoading(false);
+
+    if (!res.ok) {
+      setResendFeedback(
+        data.error ?? "Something went wrong. Please try again.",
+      );
+    } else {
+      setResendFeedback(
+        "✅ If that email has an unverified account, a new link is on its way. Check your inbox (and spam folder).",
+      );
+    }
   }
 
   return (
@@ -105,6 +143,7 @@ function LoginForm() {
         </div>
       )}
 
+      {/* ── Login form ── */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
@@ -198,6 +237,68 @@ function LoginForm() {
         </button>
       </form>
 
+      {/* ── Resend verification section — shown after EMAIL_NOT_VERIFIED or bad link ── */}
+      {showResend && (
+        <div
+          className="mt-5 pt-5 border-t"
+          style={{ borderColor: "var(--color-border)" }}
+        >
+          <p
+            className="text-sm font-medium mb-1"
+            style={{ color: "var(--color-text-body)" }}
+          >
+            Didn&apos;t receive a verification email?
+          </p>
+          <p
+            className="text-xs mb-3"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Enter your email and we&apos;ll send a fresh link. Also check your
+            spam folder.
+          </p>
+
+          {resendFeedback ? (
+            <p
+              className="text-sm px-3 py-2 rounded-lg"
+              style={{
+                backgroundColor: resendFeedback.startsWith("✅")
+                  ? "#F0FFF4"
+                  : "#FFF5F5",
+                color: resendFeedback.startsWith("✅")
+                  ? "#1A7F37"
+                  : "var(--color-accent-danger)",
+              }}
+            >
+              {resendFeedback}
+            </p>
+          ) : (
+            <form onSubmit={handleResend} className="flex gap-2">
+              <input
+                type="email"
+                value={resendEmail}
+                onChange={(e) => setResendEmail(e.target.value)}
+                required
+                placeholder="your@email.com"
+                className="flex-1 px-3 py-2 rounded-lg border text-sm outline-none"
+                style={{
+                  borderColor: "var(--color-border)",
+                  backgroundColor: "var(--color-bg-canvas)",
+                  color: "var(--color-text-body)",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={resendLoading}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                style={{ backgroundColor: "var(--color-accent-primary)" }}
+              >
+                {resendLoading ? "Sending…" : "Resend"}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+
       <p
         className="mt-6 text-center text-sm"
         style={{ color: "var(--color-text-muted)" }}
@@ -261,6 +362,13 @@ export default function LoginPage() {
       >
         <LoginForm />
       </Suspense>
+
+      <p
+        className="mt-6 text-center text-xs"
+        style={{ color: "var(--color-text-muted)" }}
+      >
+        NDPR Compliant · Your data stays private
+      </p>
     </div>
   );
 }
