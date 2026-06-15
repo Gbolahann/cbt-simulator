@@ -24,7 +24,7 @@ import {
   loadSessionLocally,
   clearSessionLocally,
 } from "@/lib/idb";
-import posthog from "@/lib/posthog";
+import { posthog } from "@/lib/posthog";
 
 export default function ExamShell({ sessionId }: { sessionId: string }) {
   const router = useRouter();
