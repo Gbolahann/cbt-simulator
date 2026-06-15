@@ -1,52 +1,18 @@
-// This file configures the initialization of Sentry on the client.
-// The added config here will be used whenever a users loads a page in their browser.
-// https://docs.sentry.io/platforms/javascript/guides/nextjs/
-
+// src/instrumentation-client.ts
 import * as Sentry from "@sentry/nextjs";
 
-Sentry.init({
-  dsn: "https://9134089f0b67cee539834cb203e12bba@o4511524558536704.ingest.us.sentry.io/4511524564893696",
-
-  // Add optional integrations for additional features
-  integrations: [Sentry.replayIntegration()],
-
-  // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-  tracesSampleRate: 1,
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
-
-  // Define how likely Replay events are sampled.
-  // This sets the sample rate to be 10%. You may want this to be 100% while
-  // in development and sample at a lower rate in production
-  replaysSessionSampleRate: 0.1,
-
-  // Define how likely Replay events are sampled when an error occurs.
-  replaysOnErrorSampleRate: 1.0,
-
-  // Enable sending user PII (Personally Identifiable Information)
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-  sendDefaultPii: true,
-});
-
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
-
-// This file configures the initialization of Sentry on the client.
-// The config you add here will be used whenever the client-side app loads.
-// https://docs.sentry.io/platforms/javascript/guides/nextjs/
-
-Sentry.init({
-  dsn: "https://9134089f0b67cee539834cb203e12bba@o4511524558536704.ingest.us.sentry.io/4511524564893696",
-
-  // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
-  tracesSampleRate: 1,
-
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
-
-  // Enable sending user PII (Personally Identifiable Information)
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-  sendDefaultPii: true,
-
-  // Capture unhandled promise rejections
-  attachStacktrace: true,
-});
+// Only initialize Sentry in production to avoid bloating dev builds
+// and reduce bundle impact on the login page
+if (process.env.NODE_ENV === "production") {
+  Sentry.init({
+    dsn: "https://9134089f0b67cee539834cb203e12bba@o4511524558536704.ingest.us.sentry.io/4511524564893696",
+    // CRITICAL: Reduce from 1.0 to 0.1 — 100% sampling is killing performance
+    tracesSampleRate: 0.1,
+    // Only capture errors in production, not every trace
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1.0,
+    enableLogs: false, // Disable logs — not needed for a CBT app
+    sendDefaultPii: false, // Don't send PII unless legally required
+    attachStacktrace: true,
+  });
+}
