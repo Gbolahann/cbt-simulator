@@ -18,11 +18,19 @@
 }
 
 /* Dark mode overrides */
+/* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg-canvas: #121212;
     --color-bg-surface: #1e1e1e;
     --color-text-body: #e9ecef;
+    --color-text-muted: #adb5bd; /* <-- Added: Lighter gray for dark mode */
+    --color-accent-primary: #4dabf7; /* <-- Added: Lighter blue for dark mode */
+    --color-accent-flagged: #f9c74f;
+    --color-accent-warning: #fab005;
+    --color-accent-danger: #fa5252;
+    --color-accent-success: #51cf66;
+    --color-accent-neutral: #868e96;
     --color-border: #343a40;
   }
 }

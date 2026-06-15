@@ -131,11 +131,6 @@ export default async function DashboardPage() {
           >
             Your Courses
           </h1>
-          <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>
-            {COURSES.length} courses · 200 questions each ·{" "}
-            {EXAM_CONFIG.QUESTION_COUNT} drawn per session ·{" "}
-            {EXAM_CONFIG.TIME_LIMIT_SECONDS / 60} minutes
-          </p>
         </div>
 
         {/* Course grid */}

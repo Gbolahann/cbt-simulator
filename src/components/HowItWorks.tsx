@@ -1,19 +1,15 @@
 "use client";
 // src/components/HowItWorks.tsx
-// Dismissible intro card shown at the top of the dashboard.
-// Once dismissed, localStorage records the choice so it stays hidden
-// on every subsequent visit — students who know the platform are not
-// forced to read it every time.
 
 import { useState } from "react";
 
 const STORAGE_KEY = "cbt_intro_dismissed";
 
 export default function HowItWorks() {
-  // Lazy initializer: reads localStorage once on first render.
-  // No useEffect needed — avoids the react-hooks/set-state-in-effect lint error
-  // and eliminates the flash-of-hidden-content on returning users.
+  // Lazy initializer reads localStorage once on mount
+  // This avoids useEffect entirely and prevents hydration mismatch
   const [visible, setVisible] = useState<boolean>(() => {
+    // Only run on client side
     if (typeof window === "undefined") return false;
     return !localStorage.getItem(STORAGE_KEY);
   });

@@ -362,13 +362,6 @@ export default function LoginPage() {
       >
         <LoginForm />
       </Suspense>
-
-      <p
-        className="mt-6 text-center text-xs"
-        style={{ color: "var(--color-text-muted)" }}
-      >
-        NDPR Compliant · Your data stays private
-      </p>
     </div>
   );
 }
