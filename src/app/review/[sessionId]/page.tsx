@@ -181,9 +181,9 @@ export default async function ReviewPage({
                     className="flex items-start gap-3 px-3 py-2.5 rounded-lg text-sm"
                     style={{
                       backgroundColor: isCorrectAnswer
-                        ? "#F0FFF4"
+                        ? "color-mix(in srgb, var(--color-accent-success) 12%, transparent)"
                         : isUserAnswer && !isCorrectAnswer
-                          ? "#FFF5F5"
+                          ? "color-mix(in srgb, var(--color-accent-danger) 12%, transparent)"
                           : "transparent",
                       border: `1px solid ${
                         isCorrectAnswer
