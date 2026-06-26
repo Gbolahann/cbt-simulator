@@ -1,7 +1,7 @@
 // src/app/admin/page.tsx
-import { auth }          from "@/lib/auth";
-import { prisma }        from "@/lib/prisma";
-import { notFound }      from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
 // ── Gate ─────────────────────────────────────────────────────────────────────
@@ -23,7 +23,7 @@ async function verifyUser(formData: FormData) {
   await prisma.user.update({
     where: { id: userId },
     // Boolean schema → true.  DateTime? schema → new Date()
-    data:  { emailVerified: true },
+    data: { emailVerified: true },
   });
 
   revalidatePath("/admin");
@@ -44,12 +44,11 @@ async function getAdminData() {
     courses,
     recentSessions,
   ] = await Promise.all([
-
     prisma.user.count(),
 
     prisma.user.findMany({
-      where:   { emailVerified: false },
-      select:  { id: true, displayName: true, email: true, createdAt: true },
+      where: { emailVerified: false },
+      select: { id: true, displayName: true, email: true, createdAt: true },
       orderBy: { createdAt: "desc" },
     }),
 
@@ -66,31 +65,31 @@ async function getAdminData() {
     }),
 
     prisma.examSession.findMany({
-      where:  { status: "SUBMITTED" },
+      where: { status: "SUBMITTED" },
       select: {
-        courseId:    true,
-        score:       true,
-        passed:      true,
+        courseId: true,
+        score: true,
+        passed: true,
         submittedAt: true,
       },
     }),
 
     prisma.course.findMany({
-      select:  { id: true, name: true },
+      select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
 
     prisma.examSession.findMany({
-      where:   { status: "SUBMITTED" },
-      take:    20,
+      where: { status: "SUBMITTED" },
+      take: 20,
       orderBy: { submittedAt: "desc" },
-      select:  {
-        id:           true,
-        courseId:     true,
-        score:        true,
-        passed:       true,
+      select: {
+        id: true,
+        courseId: true,
+        score: true,
+        passed: true,
         timeUsedSecs: true,
-        submittedAt:  true,
+        submittedAt: true,
         user: { select: { displayName: true, email: true } },
       },
     }),
@@ -98,13 +97,13 @@ async function getAdminData() {
 
   // Build per-course stats from allSubmitted (computed in JS — fast enough
   // for hundreds of sessions, avoids a complex groupBy query)
-  const courseMap = new Map(courses.map(c => [c.id, c.name]));
+  const courseMap = new Map(courses.map((c) => [c.id, c.name]));
 
   type CourseStat = {
     courseId: string;
-    name:     string;
-    total:    number;
-    today:    number;
+    name: string;
+    total: number;
+    today: number;
     avgScore: number | null;
     passRate: number | null;
   };
@@ -115,8 +114,11 @@ async function getAdminData() {
     if (!byId[s.courseId]) {
       byId[s.courseId] = {
         courseId: s.courseId,
-        name:     courseMap.get(s.courseId) ?? s.courseId,
-        total: 0, today: 0, avgScore: null, passRate: null,
+        name: courseMap.get(s.courseId) ?? s.courseId,
+        total: 0,
+        today: 0,
+        avgScore: null,
+        passRate: null,
       };
     }
     byId[s.courseId].total += 1;
@@ -126,13 +128,13 @@ async function getAdminData() {
   }
 
   for (const courseId of Object.keys(byId)) {
-    const rows   = allSubmitted.filter(s => s.courseId === courseId);
-    const scored = rows.filter(s => s.score !== null);
+    const rows = allSubmitted.filter((s) => s.courseId === courseId);
+    const scored = rows.filter((s) => s.score !== null);
     byId[courseId].avgScore = scored.length
       ? scored.reduce((n, s) => n + (s.score ?? 0), 0) / scored.length
       : null;
     byId[courseId].passRate = rows.length
-      ? (rows.filter(s => s.passed).length / rows.length) * 100
+      ? (rows.filter((s) => s.passed).length / rows.length) * 100
       : null;
   }
 
@@ -155,8 +157,11 @@ async function getAdminData() {
 function fmt(d: Date | null | undefined) {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-NG", {
-    day: "numeric", month: "short", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -178,54 +183,81 @@ export default async function AdminPage() {
   const d = await getAdminData();
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--color-bg-surface)" }}>
-
+    <div
+      className="min-h-screen"
+      style={{ backgroundColor: "var(--color-bg-surface)" }}
+    >
       {/* Header */}
       <header
         className="sticky top-0 z-10 border-b"
-        style={{ backgroundColor: "var(--color-bg-canvas)", borderColor: "var(--color-border)" }}
+        style={{
+          backgroundColor: "var(--color-bg-canvas)",
+          borderColor: "var(--color-border)",
+        }}
       >
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="font-semibold text-sm" style={{ color: "var(--color-text-body)" }}>
+          <span
+            className="font-semibold text-sm"
+            style={{ color: "var(--color-text-body)" }}
+          >
             CBT Admin
           </span>
-          <span className="text-xs" style={{ color: "var(--color-text-muted)" }}>
+          <span
+            className="text-xs"
+            style={{ color: "var(--color-text-muted)" }}
+          >
             {session?.user?.email}
           </span>
         </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-10">
-
         {/* ── Section 1: Overview ─────────────────────────────────────────── */}
         <section>
-          <h2 className="text-base font-semibold mb-4"
-              style={{ color: "var(--color-text-body)" }}>
+          <h2
+            className="text-base font-semibold mb-4"
+            style={{ color: "var(--color-text-body)" }}
+          >
             Overview
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-            {([
-              { label: "Total users",       value: d.totalUsers },
-              { label: "Unverified emails", value: d.unverifiedCount, warn: d.unverifiedCount > 0 },
-              { label: "Sessions today",    value: d.sessionsToday },
-              { label: "Submitted today",   value: d.submittedToday },
-              { label: "Active right now",  value: d.activeSessions },
-            ] as const).map(({ label, value, warn }) => (
+            {(
+              [
+                { label: "Total users", value: d.totalUsers },
+                {
+                  label: "Unverified emails",
+                  value: d.unverifiedCount,
+                  warn: d.unverifiedCount > 0,
+                },
+                { label: "Sessions today", value: d.sessionsToday },
+                { label: "Submitted today", value: d.submittedToday },
+                { label: "Active right now", value: d.activeSessions },
+              ] as { label: string; value: number; warn?: boolean }[]
+            ).map(({ label, value, warn }) => (
               <div
                 key={label}
                 className="rounded-xl border p-4"
                 style={{
                   backgroundColor: "var(--color-bg-canvas)",
-                  borderColor: warn ? "var(--color-accent-danger)" : "var(--color-border)",
+                  borderColor: warn
+                    ? "var(--color-accent-danger)"
+                    : "var(--color-border)",
                 }}
               >
                 <div
                   className="text-2xl font-semibold"
-                  style={{ color: warn ? "var(--color-accent-danger)" : "var(--color-text-body)" }}
+                  style={{
+                    color: warn
+                      ? "var(--color-accent-danger)"
+                      : "var(--color-text-body)",
+                  }}
                 >
                   {value}
                 </div>
-                <div className="text-xs mt-1" style={{ color: "var(--color-text-muted)" }}>
+                <div
+                  className="text-xs mt-1"
+                  style={{ color: "var(--color-text-muted)" }}
+                >
                   {label}
                 </div>
               </div>
@@ -235,13 +267,19 @@ export default async function AdminPage() {
 
         {/* ── Section 2: Unverified accounts ──────────────────────────────── */}
         <section>
-          <h2 className="text-base font-semibold mb-1"
-              style={{ color: "var(--color-text-body)" }}>
+          <h2
+            className="text-base font-semibold mb-1"
+            style={{ color: "var(--color-text-body)" }}
+          >
             Unverified accounts
           </h2>
-          <p className="text-xs mb-4" style={{ color: "var(--color-text-muted)" }}>
-            Students who registered but haven&apos;t clicked their verification link.
-            Verify gives them immediate access without them needing to click the email.
+          <p
+            className="text-xs mb-4"
+            style={{ color: "var(--color-text-muted)" }}
+          >
+            Students who registered but haven&apos;t clicked their verification
+            link. Verify gives them immediate access without them needing to
+            click the email.
           </p>
 
           {d.unverifiedUsers.length === 0 ? (
@@ -249,14 +287,19 @@ export default async function AdminPage() {
               ✓ No unverified accounts.
             </p>
           ) : (
-            <div className="rounded-xl border overflow-x-auto"
-                 style={{ borderColor: "var(--color-border)" }}>
+            <div
+              className="rounded-xl border overflow-x-auto"
+              style={{ borderColor: "var(--color-border)" }}
+            >
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ backgroundColor: "var(--color-bg-surface)" }}>
-                    {["Name", "Email", "Registered", ""].map(h => (
-                      <th key={h} className={th}
-                          style={{ color: "var(--color-text-muted)" }}>
+                    {["Name", "Email", "Registered", ""].map((h) => (
+                      <th
+                        key={h}
+                        className={th}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {h}
                       </th>
                     ))}
@@ -268,18 +311,26 @@ export default async function AdminPage() {
                       key={u.id}
                       style={{
                         backgroundColor: "var(--color-bg-canvas)",
-                        borderTop: i > 0 ? "1px solid var(--color-border)" : undefined,
+                        borderTop:
+                          i > 0 ? "1px solid var(--color-border)" : undefined,
                       }}
                     >
-                      <td className={`${td} font-medium`}
-                          style={{ color: "var(--color-text-body)" }}>
+                      <td
+                        className={`${td} font-medium`}
+                        style={{ color: "var(--color-text-body)" }}
+                      >
                         {u.displayName}
                       </td>
-                      <td className={td} style={{ color: "var(--color-text-muted)" }}>
+                      <td
+                        className={td}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {u.email}
                       </td>
-                      <td className={`${td} text-xs`}
-                          style={{ color: "var(--color-text-muted)" }}>
+                      <td
+                        className={`${td} text-xs`}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {fmt(u.createdAt)}
                       </td>
                       <td className={td}>
@@ -308,8 +359,10 @@ export default async function AdminPage() {
 
         {/* ── Section 3: Course activity ───────────────────────────────────── */}
         <section>
-          <h2 className="text-base font-semibold mb-4"
-              style={{ color: "var(--color-text-body)" }}>
+          <h2
+            className="text-base font-semibold mb-4"
+            style={{ color: "var(--color-text-body)" }}
+          >
             Course activity
           </h2>
 
@@ -318,14 +371,25 @@ export default async function AdminPage() {
               No submitted sessions yet.
             </p>
           ) : (
-            <div className="rounded-xl border overflow-x-auto"
-                 style={{ borderColor: "var(--color-border)" }}>
+            <div
+              className="rounded-xl border overflow-x-auto"
+              style={{ borderColor: "var(--color-border)" }}
+            >
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ backgroundColor: "var(--color-bg-surface)" }}>
-                    {["Course", "All-time", "Today", "Avg score", "Pass rate"].map(h => (
-                      <th key={h} className={th}
-                          style={{ color: "var(--color-text-muted)" }}>
+                    {[
+                      "Course",
+                      "All-time",
+                      "Today",
+                      "Avg score",
+                      "Pass rate",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className={th}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {h}
                       </th>
                     ))}
@@ -337,20 +401,32 @@ export default async function AdminPage() {
                       key={cs.courseId}
                       style={{
                         backgroundColor: "var(--color-bg-canvas)",
-                        borderTop: i > 0 ? "1px solid var(--color-border)" : undefined,
+                        borderTop:
+                          i > 0 ? "1px solid var(--color-border)" : undefined,
                       }}
                     >
-                      <td className={`${td} font-medium`}
-                          style={{ color: "var(--color-text-body)" }}>
+                      <td
+                        className={`${td} font-medium`}
+                        style={{ color: "var(--color-text-body)" }}
+                      >
                         {cs.name}
                       </td>
-                      <td className={td} style={{ color: "var(--color-text-body)" }}>
+                      <td
+                        className={td}
+                        style={{ color: "var(--color-text-body)" }}
+                      >
                         {cs.total}
                       </td>
-                      <td className={td} style={{ color: "var(--color-text-muted)" }}>
+                      <td
+                        className={td}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {cs.today}
                       </td>
-                      <td className={td} style={{ color: "var(--color-text-body)" }}>
+                      <td
+                        className={td}
+                        style={{ color: "var(--color-text-body)" }}
+                      >
                         {cs.avgScore !== null
                           ? `${cs.avgScore.toFixed(1)} / 70`
                           : "—"}
@@ -360,13 +436,16 @@ export default async function AdminPage() {
                           <span
                             className="text-xs font-semibold px-2 py-0.5 rounded-full"
                             style={{
-                              backgroundColor: cs.passRate >= 57 ? "#D1FAE5" : "#FEE2E2",
-                              color:           cs.passRate >= 57 ? "#065F46" : "#991B1B",
+                              backgroundColor:
+                                cs.passRate >= 57 ? "#D1FAE5" : "#FEE2E2",
+                              color: cs.passRate >= 57 ? "#065F46" : "#991B1B",
                             }}
                           >
                             {cs.passRate.toFixed(0)}%
                           </span>
-                        ) : "—"}
+                        ) : (
+                          "—"
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -378,8 +457,10 @@ export default async function AdminPage() {
 
         {/* ── Section 4: Recent sessions ───────────────────────────────────── */}
         <section>
-          <h2 className="text-base font-semibold mb-4"
-              style={{ color: "var(--color-text-body)" }}>
+          <h2
+            className="text-base font-semibold mb-4"
+            style={{ color: "var(--color-text-body)" }}
+          >
             Recent sessions (last 20)
           </h2>
 
@@ -388,14 +469,25 @@ export default async function AdminPage() {
               No submitted sessions yet.
             </p>
           ) : (
-            <div className="rounded-xl border overflow-x-auto"
-                 style={{ borderColor: "var(--color-border)" }}>
+            <div
+              className="rounded-xl border overflow-x-auto"
+              style={{ borderColor: "var(--color-border)" }}
+            >
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ backgroundColor: "var(--color-bg-surface)" }}>
-                    {["Student", "Course", "Score", "Time used", "Submitted"].map(h => (
-                      <th key={h} className={th}
-                          style={{ color: "var(--color-text-muted)" }}>
+                    {[
+                      "Student",
+                      "Course",
+                      "Score",
+                      "Time used",
+                      "Submitted",
+                    ].map((h) => (
+                      <th
+                        key={h}
+                        className={th}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {h}
                       </th>
                     ))}
@@ -407,21 +499,28 @@ export default async function AdminPage() {
                       key={s.id}
                       style={{
                         backgroundColor: "var(--color-bg-canvas)",
-                        borderTop: i > 0 ? "1px solid var(--color-border)" : undefined,
+                        borderTop:
+                          i > 0 ? "1px solid var(--color-border)" : undefined,
                       }}
                     >
                       <td className={td}>
-                        <div className="font-medium"
-                             style={{ color: "var(--color-text-body)" }}>
+                        <div
+                          className="font-medium"
+                          style={{ color: "var(--color-text-body)" }}
+                        >
                           {s.user.displayName}
                         </div>
-                        <div className="text-xs"
-                             style={{ color: "var(--color-text-muted)" }}>
+                        <div
+                          className="text-xs"
+                          style={{ color: "var(--color-text-muted)" }}
+                        >
                           {s.user.email}
                         </div>
                       </td>
-                      <td className={`${td} text-xs`}
-                          style={{ color: "var(--color-text-muted)" }}>
+                      <td
+                        className={`${td} text-xs`}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {d.courseMap.get(s.courseId) ?? s.courseId}
                       </td>
                       <td className={td}>
@@ -436,12 +535,16 @@ export default async function AdminPage() {
                           {s.score ?? "—"} / 70
                         </span>
                       </td>
-                      <td className={`${td} text-xs`}
-                          style={{ color: "var(--color-text-muted)" }}>
+                      <td
+                        className={`${td} text-xs`}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {fmtTime(s.timeUsedSecs)}
                       </td>
-                      <td className={`${td} text-xs`}
-                          style={{ color: "var(--color-text-muted)" }}>
+                      <td
+                        className={`${td} text-xs`}
+                        style={{ color: "var(--color-text-muted)" }}
+                      >
                         {fmt(s.submittedAt)}
                       </td>
                     </tr>
@@ -451,7 +554,6 @@ export default async function AdminPage() {
             </div>
           )}
         </section>
-
       </main>
     </div>
   );
