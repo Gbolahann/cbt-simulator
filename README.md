@@ -1,36 +1,45 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CBT Practice Simulator
 
-## Getting Started
+A web-based Computer-Based Test (CBT) practice platform built for OOU Psychology and General Studies students preparing for semester examinations.
 
-First, run the development server:
+## What it does
+
+- 9 courses with 200 questions each (PSY 202, PSY 204, PSY 206, PSY 208, OOU-PSY 262, OOU-PSY 264, SSC 202, GST 112, GST 212)
+- 35 randomly drawn questions per practice session, stratified across all modules
+- 25-minute countdown timer with auto-submit at zero
+- Answers autosaved every 2 seconds — safe even on poor connections
+- Full answer review after each session with correct answers, your answers, and explanations
+- Attempt history per course showing score trends over time
+- Works offline — answers preserved to device storage if connection drops
+- Installable as a PWA on Android and iOS
+
+## Scoring
+
+- Each correct answer: 2 marks
+- Maximum score: 70
+- Passing mark: 40 / 70 (57%)
+
+## Tech stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Database:** Neon PostgreSQL via Prisma ORM
+- **Authentication:** NextAuth v5
+- **Styling:** Tailwind CSS v4
+- **State management:** Zustand
+- **Offline support:** Serwist (service worker)
+- **Error monitoring:** Sentry
+- **Analytics:** PostHog
+- **Deployment:** Vercel
+
+## Live app
+
+[cbt-simulator-tau.vercel.app](https://cbt-simulator-tau.vercel.app)
+
+## Local development
+
+Clone the repository and install dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+git clone https://github.com/Gbolahann/cbt-simulator.git
+cd cbt-simulator
+npm install
