@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
@@ -13,6 +14,7 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,7 +46,7 @@ export default function RegisterPage() {
       return;
     }
 
-    setSuccess("Account created! Check your email to verify, then log in.");
+    router.push(`/check-email?email=${encodeURIComponent(email)}`);
   }
 
   return (
